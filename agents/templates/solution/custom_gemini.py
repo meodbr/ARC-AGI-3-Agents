@@ -166,22 +166,22 @@ class CustomGemini(Agent):
             },
             {
                 "name": GameAction.ACTION1.name,
-                "description": "Send this simple input action (1, A, Left).",
-                "parameters": empty_params,
-            },
-            {
-                "name": GameAction.ACTION2.name,
-                "description": "Send this simple input action (2, D, Right).",
-                "parameters": empty_params,
-            },
-            {
-                "name": GameAction.ACTION3.name,
                 "description": "Send this simple input action (3, W, Up).",
                 "parameters": empty_params,
             },
             {
-                "name": GameAction.ACTION4.name,
+                "name": GameAction.ACTION2.name,
                 "description": "Send this simple input action (4, S, Down).",
+                "parameters": empty_params,
+            },
+            {
+                "name": GameAction.ACTION3.name,
+                "description": "Send this simple input action (1, A, Left).",
+                "parameters": empty_params,
+            },
+            {
+                "name": GameAction.ACTION4.name,
+                "description": "Send this simple input action (2, D, Right).",
                 "parameters": empty_params,
             },
             {
@@ -226,7 +226,7 @@ class CustomGemini(Agent):
 # TURN:
 Reply with a few sentences of plain-text strategy observation about the frame to inform your next action.
         """.format(
-                latest_frame=self.pretty_print_3d_custom(latest_frame.frame),
+                latest_frame=self.pretty_print_3d(latest_frame.frame),
                 score=latest_frame.score,
                 state=latest_frame.state.name,
             )
@@ -236,6 +236,15 @@ Reply with a few sentences of plain-text strategy observation about the frame to
         return Content(role="user", parts=[Part(text=SYSTEM_INSTRUCTIONS)])
 
     def pretty_print_3d(self, array_3d: list[list[list[Any]]]) -> str:
+        lines = []
+        for i, block in enumerate(array_3d):
+            lines.append(f"Grid {i}:")
+            for row in block:
+                lines.append(f"  {row}")
+            lines.append("")
+        return "\n".join(lines)
+
+    def pretty_print_3d_old(self, array_3d: list[list[list[Any]]]) -> str:
         lines = []
         for i, block in enumerate(array_3d):
             lines.append(f"Grid {i}:")
