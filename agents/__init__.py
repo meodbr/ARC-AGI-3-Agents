@@ -10,6 +10,10 @@ from .templates.random_agent import Random
 from .templates.reasoning_agent import ReasoningAgent
 from .templates.smolagents import SmolCodingAgent, SmolVisionAgent
 
+# Custom
+from .templates.google_agents import Gemini
+from .templates.solution.custom_gemini import CustomGemini
+
 load_dotenv()
 
 AVAILABLE_AGENTS: dict[str, Type[Agent]] = {
@@ -39,4 +43,6 @@ __all__ = [
     "Recorder",
     "Playback",
     "AVAILABLE_AGENTS",
+    "Gemini",
+    "CustomGemini",
 ]

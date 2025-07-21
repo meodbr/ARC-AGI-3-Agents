@@ -6,6 +6,7 @@ readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
+    "google-adk>=1.7.0",
     "openai==1.72.0",
     "pillow>=11.2.1",
     "pydantic>=2.11.7",
