@@ -1,4 +1,4 @@
-OBSERVATION_PROMPT = "Start by stating what effect your action had, was it what you wanted? Why? Did the board change? Focus on smalls cluster of numbers and indentifie the smalls differences between both matrices. To choose your action you have to create and connect the same cluster of numbers.Then reply with a few sentences of plain-text strategy observation about the frame to inform your next action."
+OBSERVATION_PROMPT = "Start by stating what effect your action had, was it what you wanted? Why? Did the board change? Focus on smalls cluster of numbers and indentifie the smalls differences between both matrices. To choose your action you have to create and connect the same cluster of numbers.You didn't know the rules. Make a hypothesis with a few sentences of plain-text strategy observation about the frame to inform your next action. If nothing happend try an other action. "
 
 SYSTEM_INSTRUCTIONS = """
 # CONTEXT:
