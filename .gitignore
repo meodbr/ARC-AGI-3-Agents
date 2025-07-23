@@ -13,3 +13,5 @@
 recordings/*.recording.jsonl
 tests/recordings/*.recording.jsonl
 tests/recordings/not-a-recording.txt
+
+data
