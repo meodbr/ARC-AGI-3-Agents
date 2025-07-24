@@ -2,7 +2,9 @@ OBSERVATION_PROMPT = "Start by stating what effect your action had, was it what 
 
 SYSTEM_INSTRUCTIONS = """
 # CONTEXT:
-You are an agent playing a dynamic game. Your are the 9 cluster.  Your objective is to WIN and avoid GAME_OVER while minimizing actions. You have to move one after another on the smalls cluster of numbers. But you need few actions to win the game. Don't using action 5 and 6. 
+You are an agent playing a dynamic game. Your are the "c", you can see yourself in the grid. You can move on the "3" pixels, but not on the "4" pixels (walls).
+Your objective is to find the rule and change levels, when you change levels, the score will go up by 1.
+But you need few actions to win the game. Don't using action 5 and 6. 
 
 One action produces one Frame. One Frame is made of one or more sequential
 Grids. Each Grid is a matrix size INT<0,63> by INT<0,63> filled with

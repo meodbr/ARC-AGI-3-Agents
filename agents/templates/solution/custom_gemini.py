@@ -226,7 +226,7 @@ class CustomGemini(Agent):
 # TURN:
 Reply with a few sentences of plain-text strategy observation about the frame to inform your next action.
         """.format(
-                latest_frame=self.pretty_print_3d(latest_frame.frame),
+                latest_frame=self.small_pretty_print_3d(latest_frame.frame),
                 score=latest_frame.score,
                 state=latest_frame.state.name,
             )
@@ -277,15 +277,16 @@ Reply with a few sentences of plain-text strategy observation about the frame to
         return "\n".join(lines)
     
     def small_pretty_print_3d(self, array_3d: list[list[list[Any]]]) -> str:
+        step = 8
         small_array_3d = []
         for i, block in enumerate(array_3d):
             small_block = []
             for x in range(len(block)):
                 small_row = []
                 for y in range(len(block[x])):
-                    if x % 2 == 0 and y % 2 == 0:
+                    if x % step == 0 and y % step == 0:
                         small_row.append(block[x][y])
                 if small_row:
                     small_block.append(small_row)
             small_array_3d.append(small_block)
-        return self.pretty_print_3d(small_array_3d)
+        return self.pretty_print_3d_custom(small_array_3d)
