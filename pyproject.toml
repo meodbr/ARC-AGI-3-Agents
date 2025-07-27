@@ -6,15 +6,20 @@ readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
+    "gymnasium>=1.2.0",
+    "matplotlib>=3.10.3",
     "openai==1.72.0",
     "pillow>=11.2.1",
     "pydantic>=2.11.7",
+    "pyqt6>=6.9.1",
     "requests>=2.32.4",
     "smolagents>=1.20.0",
+    "torch>=2.7.1",
 ]
 
 [dependency-groups]
 dev = [
+    "ipython>=9.4.0",
     "mypy>=1.15.0",
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
