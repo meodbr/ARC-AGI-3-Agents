@@ -29,10 +29,12 @@ class CartPoleAgent(DQNModel):
         }
         super().__init__(model_class, memory, model_instanciation_args)
     
-    def training_loop():
+    def training_loop(self):
         state, info = env.reset()
 
-        action = self.select_action(state, env.action_space)
+        while 1:
+            action = self.select_action(state, env.action_space)
+            observation, reward, terminated, truncated, info = env.step(action)
         pass
 
 
