@@ -45,8 +45,7 @@ device = torch.device(
 # if torch.cuda.is_available():
 #     torch.cuda.manual_seed(seed)
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
 
 class ReplayMemory(object):
@@ -193,7 +192,7 @@ if torch.cuda.is_available() or torch.backends.mps.is_available():
 else:
     print("Using CPU for training")
     num_episodes = 200
-
+    
 for i_episode in range(num_episodes):
     # Initialize the environment and get its state
     state, info = env.reset()

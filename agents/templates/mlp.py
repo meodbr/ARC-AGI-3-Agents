@@ -7,7 +7,7 @@ from ..agent import Agent
 from ..structs import FrameData, GameAction, GameState
 
 
-class Random(Agent):
+class MLP(Agent):
     """An agent that always selects actions at random."""
 
     MAX_ACTIONS = 80
