@@ -16,3 +16,4 @@ tests/recordings/not-a-recording.txt
 
 # Data
 data
+*.prof
