@@ -31,6 +31,7 @@ class EpisodeStatistics(BaseModel):
     score: list[int]
     duration: list[int]
 
+
 class DQNModel:
     """
     Class to wrap DQN training process
@@ -44,11 +45,11 @@ class DQNModel:
     BATCH_SIZE: int  = 128
 
     def __init__(self, model_class: Type[nn.Module], memory: Memory, model_instantation_args={}):
-        self.model = model_class(*model_instantation_args)
-        self.target_model = model_class(*model_instantation_args)
+        self.model = model_class(**model_instantation_args)
+        self.target_model = model_class(**model_instantation_args)
         self.target_model.eval()
         self.memory = memory
-        self.optimizer = torch.optim.AdamW(lr=self.LR)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.LR)
 
         self.action_count = 0
         self.statistics = EpisodeStatistics(
@@ -64,12 +65,13 @@ class DQNModel:
     
     def compute_sample_batch(self, batch_size):
         transitions = self.memory.sample(batch_size)
-        transitions = zip(*transitions)
+        transitions = Transition(*zip(*transitions))
     
-        state_batch      = torch.cat(transitions["state"])
-        next_state_batch = torch.cat(transitions["next_state"])
-        actions_batch    = torch.cat(transitions["action"])
-        reward_batch     = torch.cat(transitions["reward"])
+        print(transitions)
+        state_batch      = torch.stack(transitions.state)
+        next_state_batch = torch.stack([tr for tr in transitions.next_state if tr != None])
+        actions_batch    = torch.Tensor(transitions.action)
+        reward_batch     = torch.Tensor(transitions.reward)
 
         # predicted = Q(s, a)
         reward_predictions_all_actions: torch.Tensor = self.model(state_batch)
@@ -87,7 +89,7 @@ class DQNModel:
     def train_iterations(self, n_iterations, batch_size=None) -> None:
         if not batch_size: batch_size = self.BATCH_SIZE
 
-        if len(self.memory < batch_size):
+        if len(self.memory) < batch_size:
             return
 
         self.model.train()
@@ -97,7 +99,7 @@ class DQNModel:
     def train_step(self, batch_size=None):
         if not batch_size: batch_size = self.BATCH_SIZE
 
-        if len(self.memory < batch_size):
+        if len(self.memory) < batch_size:
             return
 
         self.model.train()
@@ -114,7 +116,7 @@ class DQNModel:
 
     
     def get_epsilon(self):
-        return self.EPS_MIN + (self.EPS_START - self.EPS_MIN) * math.exp(-1 * (self.action_count/self.EPS_DECAY))
+        return self.EPS_MIN + (self.EPS_MAX - self.EPS_MIN) * math.exp(-1 * (self.action_count/self.EPS_DECAY))
 
     
     def select_action(self, observations: torch.Tensor, action_space: torch.Tensor) -> int:
@@ -122,14 +124,18 @@ class DQNModel:
         epsilon = self.get_epsilon()
 
         if p < epsilon:
-            return random.sample(action_space)
+            return torch.Tensor(random.sample(action_space, k=1)[0])
         else:
-            return self.model(observations).max(1).indices.view(1, 1)
+            return self.model(observations).max(0).indices
 
 
     def store_transition(self, transition: Transition):
         self.memory.append(transition)
         self.action_count += 1
+    
+    def store_episode_statistics(self, duration: int, score: int):
+        self.statistics.duration.append(duration)
+        self.statistics.score.append(score)
 
     
     def update_target_model(self):
@@ -141,7 +147,7 @@ class DQNModel:
     
     def plot_statistics(self):
         durations = np.array(self.statistics.duration)
-        scores = np.array(self.statistics.scores)
+        scores = np.array(self.statistics.score)
         x = range(len(durations))
         
         fig, ax = plt.subplots(1, 2)
@@ -160,6 +166,7 @@ class ConvBasicModule(nn.Module):
     Basic Conv2D module
     """
     def __init__(self, size=32):
+        super().__init__()
         self.input_size = size*size
         self.layer1 = nn.Conv2d(1, 8, kernel_size=5, stride=1, padding=2)
         self.layer2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
