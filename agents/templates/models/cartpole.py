@@ -11,7 +11,7 @@ env = gym.make("CartPole-v1")
 class FFN(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
-        hidden_size = 1024
+        hidden_size = 128
         self.layer1 = nn.Linear(input_size, hidden_size)
         self.layer2 = nn.Linear(hidden_size, hidden_size)
         self.layer3 = nn.Linear(hidden_size, output_size)
@@ -29,7 +29,7 @@ class CartPoleAgent(DQNModel):
     def __init__(self):
         state = torch.tensor(env.reset()[0])
         model_class = FFN
-        memory = TensorMemory(5000, state.shape, device=self.get_available_device())
+        memory = TensorMemory(10000, state.shape, device=self.get_available_device())
         model_instanciation_args = {
             "input_size": len(state),
             "output_size": env.action_space.n,
@@ -66,7 +66,7 @@ class CartPoleAgent(DQNModel):
             else:
                 turn_count += 1
 
-            self.train_step(batch_size=512)
+            self.train_step(batch_size=256)
             last_state = state
 
 if __name__ == "__main__":

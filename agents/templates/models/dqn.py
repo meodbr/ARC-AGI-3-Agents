@@ -85,8 +85,12 @@ class DQNModel:
         t0 = time.perf_counter()
         # expected = r + gamma * max_a(Q'(s',a))
         with torch.no_grad():
-            next_state_reward = torch.zeros((batch_size,), device=self.device)
-            next_state_reward[~is_final] = self.target_model(next_state[~is_final]).max(1).values
+            next_state_reward = torch.zeros((batch_size, 1), device=self.device)
+            next_state_reward[~is_final] = self.target_model(next_state[~is_final]).max(1).values.unsqueeze(1)
+            # print(f"shape {next_state_reward.shape}")
+            # print(f"next_state_reward {next_state_reward}")
+            # print(f"shape {reward.shape}")
+            # print(f"reward {reward}")
             expected = reward + self.GAMMA * next_state_reward
         t_expected_computation = time.perf_counter() - t0
 
@@ -100,6 +104,10 @@ class DQNModel:
         t_statistics_computation = time.perf_counter() - t0
         self.tprof["statistics_computation_time"].append(float(t_statistics_computation))
 
+        # print(f"shape {predicted.shape}")
+        # print(f"predicted {predicted}")
+        # print(f"shape {expected.shape}")
+        # print(f"expected {expected}")
         return (predicted, expected)
     
     def train_iterations(self, n_iterations, batch_size=None) -> None:
