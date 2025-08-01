@@ -65,55 +65,25 @@ class DQNModel:
         )
     
     def compute_sample_batch(self, batch_size):
-        t0 = time.perf_counter()
+        # Sample memory
         transitions = self.memory.sample(batch_size)
-        t_transition_zip = time.perf_counter() - t0
-
-        # Convert transitions to tensors
-        t0 = time.perf_counter()
-
         state, action, next_state, reward, is_final = transitions
-        test = next_state[~is_final] # TODO: Remove line, was here to test time
 
-        t_tensor_conversion = time.perf_counter() - t0
-
-        t0 = time.perf_counter()
-        # predicted = Q(s, a)
+        # Compute: predicted = Q(s, a)
         predicted = self.model(state).gather(1, action)
-        t_prediction = time.perf_counter() - t0
 
-        t0 = time.perf_counter()
-        # expected = r + gamma * max_a(Q'(s',a))
+        # Compute: expected = r + gamma * max_a(Q'(s',a))
         with torch.no_grad():
             next_state_reward = torch.zeros((batch_size, 1), device=self.device)
             next_state_reward[~is_final] = self.target_model(next_state[~is_final]).max(1).values.unsqueeze(1)
-            # print(f"shape {next_state_reward.shape}")
-            # print(f"next_state_reward {next_state_reward}")
-            # print(f"shape {reward.shape}")
-            # print(f"reward {reward}")
             expected = reward + self.GAMMA * next_state_reward
-        t_expected_computation = time.perf_counter() - t0
 
-        t0 = time.perf_counter()
-
-        self.tprof["tensor_conversion_time"].append(float(t_tensor_conversion))
-        self.tprof["transition_zip_time"].append(float(t_transition_zip))
-        self.tprof["prediction_time"].append(float(t_prediction))
-        self.tprof["expected_computation_time"].append(float(t_expected_computation))
-
-        t_statistics_computation = time.perf_counter() - t0
-        self.tprof["statistics_computation_time"].append(float(t_statistics_computation))
-
-        # print(f"shape {predicted.shape}")
-        # print(f"predicted {predicted}")
-        # print(f"shape {expected.shape}")
-        # print(f"expected {expected}")
         return (predicted, expected)
     
     def train_iterations(self, n_iterations, batch_size=None) -> None:
         if not batch_size: batch_size = self.BATCH_SIZE
 
-        if len(self.memory) < batch_size:
+        if len(self.memory) < batch_size*4:
             return
 
         self.model.train()
@@ -123,7 +93,7 @@ class DQNModel:
     def train_step(self, batch_size=None):
         if not batch_size: batch_size = self.BATCH_SIZE
 
-        if len(self.memory) < batch_size:
+        if len(self.memory) < batch_size*4:
             return
 
         self.model.train()
@@ -131,7 +101,7 @@ class DQNModel:
 
         x_hat, x = self.compute_sample_batch(batch_size)
 
-        loss: torch.Tensor = self.model.loss(x, x_hat)
+        loss = self.model.loss(x, x_hat)
 
         loss.backward()
         self.optimizer.step()
