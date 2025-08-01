@@ -9,24 +9,10 @@ import numpy as np
 from pydantic import BaseModel
 import matplotlib.pyplot as plt
 import time
+from typing import Tuple
 
 from ..rl_utils import utils
-
-Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-
-
-class Memory:
-    def __init__(self, size):
-        self.transitions = deque([], maxlen=size)
-
-    def sample(self, n: int) -> list[Transition]:
-        return random.sample(self.transitions, k=n)
-    
-    def append(self, transition: Transition):
-        self.transitions.append(transition)
-    
-    def __len__(self):
-        return len(self.transitions)
+from .memory import Memory
 
 class EpisodeStatistics(BaseModel):
     score: list[int]
@@ -47,10 +33,7 @@ class DQNModel:
 
     def __init__(self, model_class: Type[nn.Module], memory: Memory, model_instantation_args={}, device=None):
         if device is None:
-            device = torch.device(
-                "cuda" if torch.cuda.is_available() else
-                "cpu"
-            )
+            device = self.get_available_device()
         
         print(f"Using device: {device}")
         self.device = device
@@ -65,13 +48,7 @@ class DQNModel:
 
         self.action_count = 0
         self.fig = None
-        self.statistics = {
-            "score": [],
-            "duration": [],
-            "epsilon": [],
-            "loss": [],
-            "memory_size": []
-        }
+        self.statistics = {}
         self.tprof = {
             "tensor_conversion_time": [],
             "transition_zip_time": [],
@@ -80,46 +57,37 @@ class DQNModel:
             "statistics_computation_time": []
         }
 
-    def predict(self, input: torch.Tensor) -> torch.Tensor:
-        res = torch.Tensor(device=self.device)
-        self.model.eval()
-        with torch.no_grad():
-            res = self.model(input)
-        return res
+    @staticmethod
+    def get_available_device():
+        return torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "cpu"
+        )
     
     def compute_sample_batch(self, batch_size):
         t0 = time.perf_counter()
         transitions = self.memory.sample(batch_size)
-        transitions = Transition(*zip(*transitions))
         t_transition_zip = time.perf_counter() - t0
 
         # Convert transitions to tensors
-        state_batch      = torch.stack(transitions.state).to(self.device)
         t0 = time.perf_counter()
-        next_state_batch = torch.stack([next_s for next_s in transitions.next_state if next_s != None]).to(self.device)
-        actions_batch    = torch.tensor(transitions.action, dtype=torch.int64, device=self.device).unsqueeze(1)  # Unsqueeze to make it a column vector
-        reward_batch     = torch.tensor(transitions.reward, device=self.device)
+
+        state, action, next_state, reward, is_final = transitions
+        test = next_state[~is_final] # TODO: Remove line, was here to test time
 
         t_tensor_conversion = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-
         # predicted = Q(s, a)
-        reward_predictions_all_actions: torch.Tensor = self.model(state_batch)
-        predicted_reward_batch = reward_predictions_all_actions.gather(1, actions_batch).squeeze(1)  # Gather the predicted rewards for the actions taken
-
+        predicted = self.model(state).gather(1, action)
         t_prediction = time.perf_counter() - t0
 
-
-        # expected = r + gamma * max_a(Q'(s',a))
-        not_final_mask = [s != None for s in transitions.next_state]
         t0 = time.perf_counter()
-        next_state_reward_prediction: torch.Tensor = torch.zeros([batch_size], device=self.device)
+        # expected = r + gamma * max_a(Q'(s',a))
         with torch.no_grad():
-            next_state_reward_prediction[not_final_mask] = self.target_model(next_state_batch).max(dim=1).values.detach()
-
-        expected_reward_batch = reward_batch + self.GAMMA * next_state_reward_prediction
-
+            next_state_reward = torch.zeros((batch_size,), device=self.device)
+            next_state_reward[~is_final] = self.target_model(next_state[~is_final]).max(1).values
+            expected = reward + self.GAMMA * next_state_reward
         t_expected_computation = time.perf_counter() - t0
 
         t0 = time.perf_counter()
@@ -132,7 +100,7 @@ class DQNModel:
         t_statistics_computation = time.perf_counter() - t0
         self.tprof["statistics_computation_time"].append(float(t_statistics_computation))
 
-        return (predicted_reward_batch, expected_reward_batch)
+        return (predicted, expected)
     
     def train_iterations(self, n_iterations, batch_size=None) -> None:
         if not batch_size: batch_size = self.BATCH_SIZE
@@ -167,73 +135,58 @@ class DQNModel:
         return self.EPS_MIN + (self.EPS_MAX - self.EPS_MIN) * math.exp(-1 * (self.action_count/self.EPS_DECAY))
 
     
-    def select_action(self, observations: torch.Tensor, action_space: torch.Tensor) -> int:
+    def select_action(self, observations: torch.Tensor, action_space_size: int) -> int:
         p = random.random()
         epsilon = self.get_epsilon()
 
         if p < epsilon:
-            return random.sample(action_space, k=1)[0]
+            return torch.randint(0, action_space_size, (1,)).item()
         else:
-            self.model.eval()
             with torch.no_grad():
-                return self.model(observations).max(0).indices.item()
+                return self.model(observations).argmax(dim=0).item()
 
 
-    def store_transition(self, transition: Transition):
-        self.memory.append(transition)
+    def store_transition(self, transition: Tuple[torch.Tensor]):
+        for elem in transition:
+            if not isinstance(elem, torch.Tensor):
+                ValueError("All elements of transition tuple must be tensors")
+        
+        ### Auto convertion code
+        # transition = tuple(
+        #     torch.as_tensor(elem, device=self.device) if not isinstance(elem, torch.Tensor)
+        #     else elem.to(self.device)
+        #     for elem in transition
+        # )
+
+        self.memory.push(transition)
         self.action_count += 1
     
-
-    def store_episode_statistics(self, statistics: dict):
-        self.statistics["score"].append(statistics.get("score", 0))
-        self.statistics["duration"].append(statistics.get("duration", 0))
-        self.statistics["epsilon"].append(self.get_epsilon())
-        self.statistics["loss"].append(statistics.get("loss", 0))
-        self.statistics["memory_size"].append(len(self.memory))
-
     # Generic version of store_episode_statistics
-    # def store_episode_statistics(self, statistics: dict):
-    #     """
-    #     Store episode statistics in the statistics dictionary.
-    #     If the key does not exist, it will be created.
-    #     """
-    #     for key, value in statistics.items():
-    #         if key not in self.statistics:
-    #             self.statistics[key] = []
-    #         self.statistics[key].append(value)
+    def store_episode_statistics(self, statistics: dict):
+        """
+        Store episode statistics in the statistics dictionary.
+        If the key does not exist, it will be created.
+        """
+        for key, value in statistics.items():
+            if key not in self.statistics:
+                self.statistics[key] = []
+            self.statistics[key].append(value)
 
     
+    @torch.no_grad()
     def update_target_model(self):
-        policy_state_dict = self.model.state_dict()
-        target_state_dict = self.target_model.state_dict()
-        for key in policy_state_dict.keys():
-            target_state_dict[key] = utils.linear_interp(self.TAU, target_state_dict[key], policy_state_dict[key])
-        self.target_model.load_state_dict(target_state_dict)
+        for target_param, policy_param in zip(self.target_model.parameters(), self.model.parameters()):
+            target_param.data.copy_(
+                self.TAU * policy_param.data + (1.0 - self.TAU) * target_param.data
+            )
     
-    # def plot_statistics(self):
-    #     durations = np.array(self.statistics.duration)
-    #     scores = np.array(self.statistics.score)
-    #     x = range(len(durations))
-        
-    #     if self.fig is None:
-    #         self.fig = plt.figure(1)
-
-    #     self.fig.clf()
-    #     ax = self.fig.subplots(2, 1)
-    #     ax[0].set_title("Durations")
-    #     ax[0].plot(x, durations, label="Durations")
-
-    #     ax[0].set_title("Scores")
-    #     ax[1].plot(x, scores, label="Scores")
-
-    #     plt.pause(0.001)
 
     def plot_statistics(self):
         """
         Plot statistics collected during training
         """
         if self.fig is None:
-            self.fig = plt.figure(1, figsize=(15, 10))
+            self.fig = plt.figure(1, figsize=(14, 9))
         self.fig.clf()
         ax = self.fig.subplots(len(self.statistics)//2 + 1, 2, sharex=True)
 
@@ -243,13 +196,14 @@ class DQNModel:
             sum += x
             x_axis.append(sum)
 
-
         for i, (key, values) in enumerate(self.statistics.items()):
             ax[i//2, i%2].set_title(key)
             ax[i//2, i%2].plot(x_axis, np.array(values), label=key)
 
+        self.fig.tight_layout()
         plt.pause(0.001)
 
+        print("")
         print("Tprofiler statistics:")
         for key, times in self.tprof.items():
             values = np.array(times)

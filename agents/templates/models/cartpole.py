@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .conv import DQNModel, Memory
+from .dqn import DQNModel
+from .memory import TensorMemory
 
 env = gym.make("CartPole-v1")
 
@@ -26,9 +27,9 @@ class FFN(nn.Module):
 
 class CartPoleAgent(DQNModel):
     def __init__(self):
-        state, info = env.reset()
+        state = torch.tensor(env.reset()[0])
         model_class = FFN
-        memory = Memory(20000)
+        memory = TensorMemory(5000, state.shape, device=self.get_available_device())
         model_instanciation_args = {
             "input_size": len(state),
             "output_size": env.action_space.n,
@@ -41,27 +42,32 @@ class CartPoleAgent(DQNModel):
 
         turn_count = 0
         while 1:
-            last_state = state
-            action = self.select_action(state, range(env.action_space.n))
+            action = self.select_action(state, env.action_space.n)
             observation, reward, terminated, truncated, info = env.step(action)
             state = torch.tensor(observation, device=self.device, dtype=torch.float32)
 
+            self.store_transition((
+                last_state, 
+                torch.tensor(action, device=self.device, dtype=torch.long),
+                state, 
+                torch.tensor(reward, device=self.device, dtype=torch.float32),
+                torch.tensor(terminated, device=self.device, dtype=torch.bool),
+            ))
+
             if terminated:
-                state = None
-                self.store_transition((last_state, action, state, reward))
                 self.store_episode_statistics({
-                    "score": 0,
                     "duration": turn_count,
-                    "loss": 0,  # Placeholder, loss is not computed here
+                    "memory_size": len(self.memory),
+                    "epsilon": self.get_epsilon(),
                 })
                 self.plot_statistics()
                 state = torch.tensor(env.reset()[0], device=self.device, dtype=torch.float32)
                 turn_count = 0
             else:
                 turn_count += 1
-                self.store_transition((last_state, action, state, reward))
 
             self.train_step(batch_size=512)
+            last_state = state
 
 if __name__ == "__main__":
     ag = CartPoleAgent()
