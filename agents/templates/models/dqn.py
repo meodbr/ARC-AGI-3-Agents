@@ -26,7 +26,7 @@ class DQNModel:
     GAMMA: float     = 0.99
     LR: float        = 1e-3
     EPS_MAX: float   = 0.9
-    EPS_MIN: float   = 0.1
+    EPS_MIN: float   = 0.02
     EPS_DECAY: float = 2500
     TAU: float       = 0.005
     BATCH_SIZE: int  = 128
